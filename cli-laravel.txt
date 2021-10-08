@@ -1,0 +1,130 @@
+//create laravel folder
+composer create-project laravel/laravel laravel-template
+
+
+php artisan serve
+
+//go to .env file then set your database
+
+php artisan make:model Product --migration
+
+//locate database/migration find your table then add column before you execute ` php artisan migrate ` 
+
+php artisan migrate 
+
+//in order to post request go to your model then protect $fillable = ['column','column']
+
+//create controller --api is to create function like crud
+php artisan make:controller ProductController --api
+
+//include controller in api.php 'use App\Http\Controllers\ProductController;'
+
+//include model in ProductController.php 'use App\Models\Product;'
+
+// if you had a basic crud in your route, you can do like this
+Route::resource('products', ProductController::class);
+
+//install composer sanctum
+composer require laravel/sanctum
+
+//
+php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
+
+//run the migration to migrate to database
+php artisan migrate
+
+//go to app/Http/kernel.php then paste this 
+'api' => [
+    \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+    'throttle:api',
+    \Illuminate\Routing\Middleware\SubstituteBindings::class,
+],
+
+//create AuthController not generate api methods
+php artisan make:controller AuthController 
+
+//inside AuthController
+
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Hash;
+
+//then make a function
+public function register(Request $request){
+  $fields = $request->validate([
+      'name' => 'required|string',
+      // unique users table and email is the field
+      'email' => 'required|string|unique:users,email',
+      'password' => 'required|string/confirmed'
+  ]);
+
+  $user = User::create([
+      'name' => $fields['name'],
+      'email' => $fields['email'],
+      'password' => bcrypt($fields['password'])
+  ]);
+
+  $token = $user->createToken('myAppToken')->plainTextToken;
+
+  $response = [
+      'user' => $user,
+      'token' => $token
+  ];
+
+  return response($response, 201);
+}
+
+//create route then inclue controller inside the api
+use App\Http\Controllers\AuthController;
+
+Route::post('/register', [AuthController::class, 'register']);
+
+//if you register then
+copy tokens then
+go to authorization the Bearer Token  then paste the token you copied
+
+//if logout you must destroy tokens
+//create route logout
+
+Route::post('/logout', [AuthController::class, 'logout']);
+
+//make function logout
+public function logout(Request $request){
+  auth()->user()->tokens()->delete();
+  return [
+      'message' => 'Logged out'
+  ];
+}
+
+//create login function and route
+
+Route::post('/login', [AuthController::class, 'login']);
+
+public function login(Request $request){
+  $fields = $request->validate([
+      // unique users table and email is the field
+      'email' => 'required|string|unique:users,email',
+      'password' => 'required|string|confirmed'
+  ]);
+
+  // check email
+  $user = User::where('email', $fields['email'])->first();
+
+  // check password
+  if(!$user || !Hash::check($fields['password'], $user->password)){
+      return response([
+          'message' => 'Bad Creds'
+      ], 401);
+  }
+
+  $token = $user->createToken('myAppToken')->plainTextToken;
+
+  $response = [
+      'user' => $user,
+      'token' => $token
+  ];
+
+  return response($response, 201);
+}
+
